@@ -1,0 +1,103 @@
+/* Code Base Part 1:
+ * Het bewegen van een snake met een lengte van 1 
+ * 
+ * Eindresultaat:
+ * Snake op een 8x8 LED matrix + joystick
+ * 
+ * 21-6-2021
+ * Door Collin Kasbergen
+ */
+
+#include <LedControl.h>
+
+/* Joystick PINs */
+#define VRX     A0
+#define VRY     A1
+#define SW      2
+
+/* Display PINs */
+#define CLK     8
+#define CS      9
+#define DIN     10
+
+#define MAAT    8
+#define STAP_DELAY 50
+
+int snake[2];
+
+LedControl lc = LedControl(DIN, CLK, CS, 1);
+
+void setup() {
+  pinMode(SW, INPUT_PULLUP);
+  pinMode(VRX, INPUT);
+  pinMode(VRY, INPUT);
+
+  lc.shutdown(0, false);
+  lc.setIntensity(0, 8);
+
+  startGame();
+
+  Serial.begin(9600);
+}
+
+void loop() {
+  leegScherm();
+  leesJoystick();
+  verplaatsSnake();
+  tekenSnake();
+}
+
+void startGame(){
+  randomSeed(analogRead(A5));
+  snake[0] = random((MAAT-1));
+  snake[1] = random((MAAT-1));
+}
+
+void leegScherm() {
+  for (int x = 0; x < MAAT; x++) {
+    for (int y = 0; y < MAAT; y++) {
+      lc.setLed(0, x, y, 0);
+    }
+  }
+}
+
+void leesJoystick() {
+  int verplaatsingX = map(analogRead(VRX),0,1023,-2,2);
+  int verplaatsingY = map(analogRead(VRY),0,1023,-2,2);
+
+  if(verplaatsingX == 2){
+    snake[1]--;
+  }
+  if(verplaatsingX == -2){
+    snake[1]++;
+  }
+  if(verplaatsingY == 2){
+    snake[0]--;
+  }
+  if(verplaatsingY == -2){
+    snake[0]++;
+  }
+}
+
+void verplaatsSnake(){
+  if(snake[0] > (MAAT-1)){
+    snake[0] = 0;
+  }
+
+  if(snake[1] > (MAAT-1)){
+    snake[1] = 0;
+  }
+
+  if(snake[0] < 0){
+    snake[0] = (MAAT-1);
+  }
+
+  if(snake[1] < 0){
+    snake[1] = (MAAT-1);
+  }
+}
+
+void tekenSnake(){
+  lc.setLed(0, snake[0], snake[1], 1);
+  delay(STAP_DELAY);
+}
