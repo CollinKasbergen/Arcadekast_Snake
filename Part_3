@@ -1,0 +1,227 @@
+/* Code Base Part 3:
+    Bug Fixes
+
+   Eindresultaat:
+   Snake op een 8x8 LED matrix + joystick
+
+   21-6-2021
+   Door Collin Kasbergen
+*/
+
+#include <LedControl.h>
+
+/* Joystick PINs */
+#define VRX     A0
+#define VRY     A1
+#define SW      2
+
+/* Display PINs */
+#define CLK     8
+#define CS      9
+#define DIN     10
+
+#define MAAT    8
+#define STAP_DELAY 50
+
+#define MAXLENGTE 12
+
+int lengte;
+int snake[MAXLENGTE][2];
+
+int punt[2];
+double timer;
+int blinkSnelheid = 300;
+
+// Blije Smiley
+byte blij[8] = {B00111100, B01000010, B10100101, B10000001, B10100101, B10011001, B01000010, B00111100};
+// Zielige Smiley
+byte zielig[8] = {B00111100, B01000010, B10100101, B10000001, B10011001, B10100101, B01000010, B00111100};
+
+LedControl lc = LedControl(DIN, CLK, CS, 1);
+
+void setup() {
+  pinMode(SW, INPUT_PULLUP);
+  pinMode(VRX, INPUT);
+  pinMode(VRY, INPUT);
+
+  lc.shutdown(0, false);
+  lc.setIntensity(0, 8);
+
+  startGame();
+
+  Serial.begin(9600);
+}
+
+void loop() {
+  leegScherm();
+  leesJoystick();
+  verplaatsSnake();
+  checkPunt();
+  checkHit();
+  tekenGame();
+}
+
+void startGame() {
+  lengte = 1;
+
+  randomSeed(analogRead(A5));
+  int snakeX = random((MAAT - 1));
+  int snakeY = random((MAAT - 1));
+
+  snake[0][0] = snakeX;
+  snake[0][1] = snakeY;
+
+  int puntX = random((MAAT - 1));
+  int puntY = random((MAAT - 1));
+
+  while (puntX == snakeX && puntY == snakeY) {
+    puntX = random((MAAT - 1));
+    puntY = random((MAAT - 1));
+  }
+
+  timer = millis();
+}
+
+void leegScherm() {
+  for (int x = 0; x < MAAT; x++) {
+    for (int y = 0; y < MAAT; y++) {
+      lc.setLed(0, x, y, 0);
+    }
+  }
+}
+
+void leesJoystick() {
+  int verplaatsingX = map(analogRead(VRX), 0, 1023, -2, 2);
+  int verplaatsingY = map(analogRead(VRY), 0, 1023, -2, 2);
+
+  if (verplaatsingX == 2) {
+    vulDeStaart();
+    snake[0][1]--;
+  }
+  if (verplaatsingX == -2) {
+    vulDeStaart();
+    snake[0][1]++;
+  }
+  if (verplaatsingY == 2) {
+    vulDeStaart();
+    snake[0][0]--;
+  }
+  if (verplaatsingY == -2) {
+    vulDeStaart();
+    snake[0][0]++;
+  }
+}
+
+void verplaatsSnake() {
+  if (snake[0][0] > (MAAT - 1)) {
+    snake[0][0] = 0;
+  }
+
+  if (snake[0][1] > (MAAT - 1)) {
+    snake[0][1] = 0;
+  }
+
+  if (snake[0][0] < 0) {
+    snake[0][0] = (MAAT - 1);
+  }
+
+  if (snake[0][1] < 0) {
+    snake[0][1] = (MAAT - 1);
+  }
+}
+
+void checkPunt() {
+  Serial.println(lengte);
+  if (punt[0] == snake[0][0] && punt[1] == snake[0][1]) {
+    while (zitPuntOpSnake()) {
+      punt[0] = random((MAAT - 1));
+      punt[1] = random((MAAT - 1));
+    }
+    if (lengte < (MAXLENGTE - 1)) {
+      lengte++;
+    } else {
+      spelGewonnen();
+    }
+  }
+}
+
+boolean zitPuntOpSnake() {
+  for (int teller = 0; teller < lengte; teller++) {
+    if (punt[0] == snake[teller][0] && punt[1] == snake[teller][1]) {
+      return true;
+      break;
+    }
+  }
+  return false;
+}
+
+void vulDeStaart() {
+  for (int teller = lengte; teller > 0; teller--) {
+    snake[teller][0] = snake[teller - 1][0];
+    snake[teller][1] = snake[teller - 1][1];
+  }
+}
+
+void tekenGame() {
+  for (int teller = 0; teller < lengte; teller++) {
+    int x = snake[teller][0];
+    int y = snake[teller][1];
+    lc.setLed(0, x, y, 1);
+  }
+  tekenPunt();
+  delay(STAP_DELAY);
+}
+
+void tekenPunt() {
+  if (millis() - timer < blinkSnelheid / 2) {
+    lc.setLed(0, punt[0], punt[1], 1);
+  }
+  if (millis() - timer > blinkSnelheid / 2) {
+    lc.setLed(0, punt[0], punt[1], 0);
+  }
+  if (millis() - timer > blinkSnelheid) {
+    timer = millis();
+  }
+}
+
+void checkHit() {
+  if (lengte > 1) {
+    int x = snake[0][0];
+    int y = snake[0][1];
+    for (int teller = 1; teller < lengte; teller++) {
+      if (x == snake[teller][0] && y == snake[teller][1]) {
+        spelVerloren();
+        break;
+      }
+    }
+  }
+}
+
+void spelGewonnen() {
+  Serial.println("Game Gewonnen!!!!!!");
+  leegScherm();
+  tekenSmiley('b');
+  delay(2000);
+  startGame();
+}
+
+void spelVerloren() {
+  Serial.println("Game Verloren!!!!!!");
+  leegScherm();
+  tekenSmiley('z');
+  delay(2000);
+  startGame();
+}
+
+void tekenSmiley(char type) {
+  for (int teller = 0; teller < 8; teller++) {
+    byte currentByte;
+    if (type == 'b') {
+      currentByte = blij[teller];
+    }
+    if (type == 'z') {
+      currentByte = zielig[teller];
+    }
+    lc.setColumn(0, map(teller, 0, 7, 7, 0), currentByte);
+  }
+}
